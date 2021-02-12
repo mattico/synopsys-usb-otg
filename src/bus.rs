@@ -477,7 +477,8 @@ impl<USB: UsbPeripheral> usb_device::bus::UsbBus for UsbBus<USB> {
             write_reg!(otg_global, regs.global(), GINTMSK,
                 USBRST: 1, ENUMDNEM: 1,
                 USBSUSPM: 1, WUIM: 1,
-                IEPINT: 1, RXFLVLM: 1
+                IEPINT: 1, RXFLVLM: 1,
+                SRQIM: 1, OTGINT: 1
             );
 
             // clear pending interrupts
@@ -564,9 +565,11 @@ impl<USB: UsbPeripheral> usb_device::bus::UsbBus for UsbBus<USB> {
 
             let core_id = read_reg!(otg_global, regs.global(), CID);
 
-            let (wakeup, suspend, enum_done, reset, iep, rxflvl) = read_reg!(otg_global, regs.global(), GINTSTS,
-                WKUPINT, USBSUSP, ENUMDNE, USBRST, IEPINT, RXFLVL
+            let (srqint, wakeup, suspend, enum_done, reset, iep, rxflvl) = read_reg!(otg_global, regs.global(), GINTSTS,
+                SRQINT, WKUPINT, USBSUSP, ENUMDNE, USBRST, IEPINT, RXFLVL
             );
+
+            let sedet = read_reg!(otg_global, regs.global(), GOTGINT, SEDET);
 
             if reset != 0 {
                 write_reg!(otg_global, regs.global(), GINTSTS, USBRST: 1);
@@ -624,6 +627,16 @@ impl<USB: UsbPeripheral> usb_device::bus::UsbBus for UsbBus<USB> {
                 write_reg!(otg_global, regs.global(), GINTSTS, WKUPINT: 1);
 
                 PollResult::Resume
+            } else if srqint != 0 {
+                // Connected
+                write_reg!(otg_global, regs.global(), GINTSTS, SRQINT: 1);
+
+                PollResult::Resume
+            } else if sedet != 0 {
+                // Disconnected
+                write_reg!(otg_global, regs.global(), GOTGINT, SEDET: 1);
+
+                PollResult::Suspend
             } else if suspend != 0 {
                 write_reg!(otg_global, regs.global(), GINTSTS, USBSUSP: 1);
 
