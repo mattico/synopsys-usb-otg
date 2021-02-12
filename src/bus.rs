@@ -442,8 +442,8 @@ impl<USB: UsbPeripheral> usb_device::bus::UsbBus for UsbBus<USB> {
                 0x0000_2000 | 0x0000_2100 | 0x0000_2300 | 0x0000_3000 | 0x0000_3100 => {
                     // F446-like chips have the GCCFG.VBDEN bit with the opposite meaning
 
-                    //modify_reg!(otg_global, regs.global, GCCFG, VBDEN: 1);
-                    modify_reg!(otg_global, regs.global(), GCCFG, |r| r | (1 << 21));
+                    //modify_reg!(otg_global, regs.global, GCCFG, VBDEN: 0);
+                    modify_reg!(otg_global, regs.global(), GCCFG, |r| r & !(1 << 21));
 
                     // Force B-peripheral session
                     //modify_reg!(otg_global, regs.global, GOTGCTL, BVALOEN: 1, BVALOVAL: 1);
