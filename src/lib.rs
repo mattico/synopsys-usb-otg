@@ -50,6 +50,18 @@ pub unsafe trait UsbPeripheral: Send + Sync {
     ///
     /// This function should turn on LDO and PLL and wait for PHY clock to become stable.
     fn setup_internal_hs_phy(&self) {}
+
+    /// Returns the maximum number of instructions that can be executed per microsecond.
+    ///
+    /// Used to calculate delay loop iterations and timeouts. Note that some microarchitectures
+    /// like Cortex-M7 are dual-issue.
+    /// 
+    /// The default implementation has no access to device clock speed and is very conservative;
+    /// delays and timeouts will be very long on slower microcontrollers.
+    // TODO(0.3.0): Remove default impl
+    fn instructions_per_us(&self) -> u32 {
+        1000
+    }
 }
 
 /// USB PHY type

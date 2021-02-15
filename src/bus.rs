@@ -126,6 +126,19 @@ impl<USB: UsbPeripheral> UsbBus<USB> {
         }
     }
 
+    /// Delays execution for at least `microseconds`.
+    fn delay(&self, microseconds: u32) {
+        // Cannot rely on more than one instruction per iteration due to unrolling.
+        let mut iterations = self.peripheral.instructions_per_us() * microseconds;
+        while iterations > 0 {
+            iterations -= 1;
+            unsafe {
+                // Volatile reads to prevent the loop being optimized out.
+                core::ptr::read_volatile(self as *const _);
+            }
+        }
+    }
+
     #[cfg(feature = "hs")]
     /// Reads from a ULPI register in an external ULPI PHY.
     ///
@@ -160,8 +173,8 @@ impl<USB: UsbPeripheral> UsbBus<USB> {
                 ADDR: addr as u32
             );
 
-            // ULPI transactions should take less than 1us. 1000 iterations should be enough even for fast MCUs.
-            let mut timeout = 1000;
+            // ULPI transactions should take less than 1us.
+            let mut timeout = self.peripheral.instructions_per_us();
             while timeout > 0 {
                 // Wait for transaction to complete
                 if read_reg!(otg_global, regs.global(), PHYCR, DONE) != 0 {
@@ -196,8 +209,8 @@ impl<USB: UsbPeripheral> UsbBus<USB> {
                 DATA: data as u32
             );
 
-            // ULPI transactions should take less than 1us. 1000 iterations should be enough even for fast MCUs.
-            let mut timeout = 1000;
+            // ULPI transactions should take less than 1us.
+            let mut timeout = self.peripheral.instructions_per_us();
             while timeout > 0 {
                 // Wait for transaction to complete
                 if read_reg!(otg_global, regs.global(), PHYCR, DONE) != 0 {
@@ -556,6 +569,17 @@ impl<USB: UsbPeripheral> usb_device::bus::UsbBus for UsbBus<USB> {
 
     fn resume(&self) {
         // Nothing to do here?
+    }
+
+    fn force_reset(&self) -> Result<()> {
+        interrupt::free(|cs| {
+            let regs = self.regs.borrow(cs);
+            write_reg!(otg_device, regs.device(), DCTL, SDIS: 1); // Soft disconnect
+            self.delay(3_000); // Wait at least 3ms
+            write_reg!(otg_device, regs.device(), DCTL, SDIS: 0); // Soft connect
+            self.delay(3_000); // Wait at least 3ms
+        });
+        Ok(())
     }
 
     fn poll(&self) -> PollResult {
