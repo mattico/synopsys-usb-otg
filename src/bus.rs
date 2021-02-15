@@ -129,12 +129,18 @@ impl<USB: UsbPeripheral> UsbBus<USB> {
     /// Delays execution for at least `microseconds`.
     fn delay(&self, microseconds: u32) {
         // Cannot rely on more than one instruction per iteration due to unrolling.
+        #[allow(unused_mut)]
         let mut iterations = self.peripheral.instructions_per_us() * microseconds;
-        while iterations > 0 {
-            iterations -= 1;
-            unsafe {
-                // Volatile reads to prevent the loop being optimized out.
-                core::ptr::read_volatile(self as *const _);
+        #[cfg(feature = "cortex-m")]
+        cortex_m::asm::delay(iterations);
+        #[cfg(not(feature = "cortex-m"))]
+        {
+            static VALID_MEMORY: u32 = 0;
+            while iterations > 0 {
+                iterations -= 1;
+                unsafe {
+                    core::ptr::read_volatile(&VALID_MEMORY as *const _);
+                }
             }
         }
     }
