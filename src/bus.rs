@@ -486,6 +486,7 @@ impl<USB: UsbPeripheral> usb_device::bus::UsbBus for UsbBus<USB> {
             };
             modify_reg!(otg_device, regs.device(), DCFG,
                 PFIVL: 0b00,
+                XCVRDLY: 1,
                 DSPD: speed
             );
 
